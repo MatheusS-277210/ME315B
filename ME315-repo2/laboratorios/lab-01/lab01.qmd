@@ -1,0 +1,134 @@
+```{r q1}
+library(tidyverse)
+```
+
+
+```{r q2}
+table1 #está no formato tidy, pois, cada variável ocupa uma coluna distinta e cada valor tem sua própia célula.
+
+table2 #não está no formato tidy, pois, a coluna type possuí o nome de variáveis e a coluna count possuí os valores que pertence a essas variáveis.
+
+table3 #não está no formato tidy, pois, a coluna rate possuí duas variáveis distintas, combinadas na mesma célula como uma string.
+
+table4a#não está no formato tidy, pois, as colunas(1999,2000) representariam os valores de uma variável year e não os nomes das variáveis em si.
+
+table4b#não está no formato tidy, pois, possuí o mesmo caso da table4b.
+```
+
+```{r q3_1}
+library(dplyr)
+```
+
+```{r q3_2}
+taxas <- table1 %>%
+  mutate(taxa =(cases / population) * 10000)
+taxas
+```
+
+```{r q4}
+casos_por_ano <- table1 %>%
+  group_by(year) %>%
+  summarise(total_casos_ano = sum(cases))
+casos_por_ano
+```
+
+```{r q5}
+casos_por_pais <- table1 %>%
+  group_by(country) %>%
+  summarise(total_casos_país = sum(cases))
+casos_por_pais
+```
+
+```{r q6}
+mudanca_casos <- table1 %>%
+  filter(year %in% c(1999,2000)) %>%
+  group_by(country, year) %>%
+  summarise(total_casos = sum(cases))
+mudanca_casos
+```
+
+```{r q7_1}
+library(ggplot2)
+```
+
+```{r q7_2}
+#taxas -> Reutilizando da questão
+ggplot(taxas, aes(x= year, y=taxa, colour = country, group = country)) +
+  geom_line() +
+  geom_point() + 
+  labs( x = "Ano", y = "Taxa a cada 10000 habitantes", color = "País")
+```
+
+```{r q8_1}
+table2_dados <- table2 %>%
+  pivot_wider(names_from = type, values_from = count)
+table2_dados
+```
+
+```{r q8_2}
+table2_taxas <- table2_dados %>%
+  mutate(taxa = (cases/population) * 10000)
+table2_taxas
+```
+
+```{r q8_3}
+table4a_casos <- table4a %>%
+  pivot_longer(cols = c('1999', '2000'), names_to = "year", values_to = "cases")
+table4a_casos
+
+table4b_populacao <- table4b %>%
+  pivot_longer(cols = c('1999', '2000'), names_to = "year", values_to = "population")
+table4b_populacao
+```
+
+```{r q8_4}
+table4_taxas <- left_join(table4a_casos, table4b_populacao, by = c("country", "year")) %>%
+  mutate(taxa = (cases/population)* 10000)
+table4_taxas
+```
+
+```{r q9}
+ggplot(table2_taxas, aes(x= year, y=taxa, colour = country, group = country)) +
+  geom_line() +
+  geom_point() + 
+  labs( x = "Ano", y = "Taxa a cada 10000 habitantes", color = "País")
+```
+
+```{r q10}
+#usando da questão 8_3
+tidy4a <- table4a %>%
+  pivot_longer(cols = c('1999', '2000'), names_to = "year", values_to = "cases")
+tidy4a
+```
+
+```{r q11}
+#novamente, usando da questão 8_3
+tidy4b <- table4b %>%
+  pivot_longer(cols = c('1999', '2000'), names_to = "year", values_to = "population")
+tidy4b
+```
+
+```{r 12}
+#usando da questão 8_4 agora
+tidy4ab <- left_join(tidy4a, tidy4b, by = c("country", "year")) %>%
+  mutate(taxa = (cases/population)* 10000)
+tidy4ab
+
+"O comando left_join serve para unir duas tabelas diferentes em uma só, usando colunas em comum como uma identificação. Ele mantém todas as linhas da primeira tabela e busca na segunda tabela apenas as informações que batem com os mesmos países e anos.
+
+No exercício, como o número de casos estava na tidy4a e a população na tidy4b, o left_join foi necessário para juntar esses dois dados na mesma tabela."
+```
+
+```{r 13}
+#utilizando da questão 8_1
+tidy2 <- table2 %>%
+  pivot_wider(names_from = type, values_from = count)
+tidy2
+```
+
+```{r 14}
+tidy3 <- table3 %>% 
+  separate(rate, into = c("cases", "population"), sep = "/", convert = TRUE)
+tidy3
+```
+
