@@ -1,0 +1,145 @@
+---
+title: "Lab02"
+author: "Matheus Soares - RA:277210"
+format: typst
+editor: visual
+---
+
+## Pacotes utilizados
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggcal)
+library(ggplot2)
+```
+
+## Questão 1 - Estatísticas suficientes
+
+O que queremos no final é um **percentual** (proporção de voos atrasados).
+Uma proporção só precisa de duas coisas para ser calculada, não importa o
+tamanho do lote de dados:
+
+- `n_atrasados`: quantos voos tiveram `ARRIVAL_DELAY > 10`
+- `n_total`: quantos voos existem no grupo (dia/mês/cia)
+
+Com esses dois números dá pra calcular `Perc = n_atrasados / n_total`.
+
+## Questão 2 - Função `getStats`
+
+```{r}
+getStats <- function(input, pos){
+
+  input %>%
+    filter(AIRLINE %in% c("AA", "DL", "UA", "US")) %>%
+    filter(!is.na(ARRIVAL_DELAY), !is.na(DAY), !is.na(MONTH), !is.na(AIRLINE)) %>%
+    group_by(DAY, MONTH, AIRLINE) %>%
+    summarise(
+      n_atrasados = sum(ARRIVAL_DELAY > 10),
+      n_total     = n(),
+      .groups = "drop"
+    )
+
+}
+```
+
+
+## Questão 3 - Leitura em chunks com `read_csv_chunked`
+
+```{r}
+lista_resultados <- list()
+
+minha_callback <- function(x, pos){
+  lista_resultados[[length(lista_resultados) + 1]] <<- getStats(x, pos)
+}
+
+read_csv_chunked(
+  file       = "flights.csv",
+  callback   = DataFrameCallback$new(minha_callback),
+  chunk_size = 100000,
+  col_types  = cols_only(
+    MONTH         = col_integer(),
+    DAY           = col_integer(),
+    AIRLINE       = col_character(),
+    ARRIVAL_DELAY = col_double()
+  )
+)
+
+stats_parcial <- bind_rows(lista_resultados)
+```
+
+## Questão 4 - Função `computeStats`
+
+```{r}
+computeStats <- function(stats){
+
+  stats %>%
+    group_by(AIRLINE, MONTH, DAY) %>%
+    summarise(
+      n_atrasados = sum(n_atrasados),
+      n_total     = sum(n_total),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Data = as.Date(paste(2015, MONTH, DAY, sep = "-")),
+      Perc = n_atrasados / n_total
+    ) %>%
+    rename(Cia = AIRLINE) %>%
+    select(Cia, Data, Perc)
+
+}
+
+stats_final <- computeStats(stats_parcial)
+```
+
+## Questão 5 - Mapas de calor tipo calendário (`ggcal`)
+
+```{r}
+
+pal <- scale_fill_gradient(low = "blue", high = "red")
+
+baseCalendario <- function(stats, cia){
+
+  sub <- stats %>% filter(Cia == cia)
+
+  ggcal(sub$Data, sub$Perc)
+
+}
+
+cAA <- baseCalendario(stats_final, "AA")
+cDL <- baseCalendario(stats_final, "DL")
+cUA <- baseCalendario(stats_final, "UA")
+cUS <- baseCalendario(stats_final, "US")
+```
+
+### American Airlines (AA)
+
+```{r}
+cAA + pal + ggtitle("Percentual de atrasos - American Airlines (AA)")
+```
+
+### Delta Air Lines (DL)
+
+```{r}
+cDL + pal + ggtitle("Percentual de atrasos - Delta Air Lines (DL)")
+```
+
+### United Airlines (UA)
+
+```{r}
+cUA + pal + ggtitle("Percentual de atrasos - United Airlines (UA)")
+```
+
+### US Airways (US)
+
+```{r}
+cUS + pal + ggtitle("Percentual de atrasos - US Airways (US)")
+```
+
+
+## Hora:
+```{r}
+Sys.setenv(TZ = "America/Sao_Paulo")
+Sys.time()
+```
+
