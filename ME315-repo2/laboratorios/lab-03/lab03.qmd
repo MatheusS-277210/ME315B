@@ -1,0 +1,87 @@
+---
+title: "Lab_03"
+author: "Matheus Soares - RA:277210"
+format: html
+editor: visual
+---
+
+### 1. Importando os arquivos
+
+```{r}
+library(readr)
+library(dplyr)
+
+# importa tudo 
+airlines <- read_csv("airlines.csv")
+
+# só as colunas pedidas
+airports <- read_csv("airports.csv",
+                      col_select = c(IATA_CODE, CITY, STATE, LATITUDE, LONGITUDE))
+```
+
+```{r}
+soma <- c()
+n <- c()
+aeroporto <- c()
+
+processa <- function(chunk, pos) {
+  chunk <- chunk %>%
+    filter(!is.na(DESTINATION_AIRPORT), !is.na(ARRIVAL_DELAY)) %>%
+    filter(!grepl("^1", DESTINATION_AIRPORT))
+  
+  resumo <- chunk %>%
+    group_by(DESTINATION_AIRPORT) %>%
+    summarise(soma = sum(ARRIVAL_DELAY), n = n())
+  
+  aeroporto <<- c(aeroporto, resumo$DESTINATION_AIRPORT)
+  soma <<- c(soma, resumo$soma)
+  n <<- c(n, resumo$n)
+}
+
+read_csv_chunked("flights.csv",
+                  callback = SideEffectChunkCallback$new(processa),
+                  chunk_size = 1e6,
+                  col_types = cols_only(
+                    DESTINATION_AIRPORT = col_character(),
+                    ARRIVAL_DELAY = col_double()
+                  ))
+
+flights <- tibble(DESTINATION_AIRPORT = aeroporto, soma = soma, n = n) %>%
+  group_by(DESTINATION_AIRPORT) %>%
+  summarise(soma = sum(soma), n = sum(n)) %>%
+  mutate(atraso_medio = soma / n) %>%
+  select(DESTINATION_AIRPORT, atraso_medio)
+```
+
+### 2. Join
+
+```{r}
+anti_join(flights, airports, by = c("DESTINATION_AIRPORT" = "IATA_CODE"))
+
+flights <- left_join(flights, airports,
+                      by = c("DESTINATION_AIRPORT" = "IATA_CODE"))
+```
+
+### 3. Aeroportos por estado
+
+```{r}
+airports %>%
+  group_by(STATE) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+```
+
+### 4. Mapa
+
+```{r}
+library(leaflet)
+
+flights_mapa <- flights %>% filter(!is.na(LATITUDE), !is.na(LONGITUDE))
+
+this <- leaflet(flights_mapa) %>%
+  addTiles() %>%
+  addMarkers(lng = ~LONGITUDE, lat = ~LATITUDE,
+             popup = ~paste(DESTINATION_AIRPORT, round(atraso_medio, 1)))
+
+this
+```
