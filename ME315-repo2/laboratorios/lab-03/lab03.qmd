@@ -1,7 +1,9 @@
 ---
 title: "Lab_03"
 author: "Matheus Soares - RA:277210"
-format: html
+format:
+  html:
+    embed-resources: true
 editor: visual
 ---
 
