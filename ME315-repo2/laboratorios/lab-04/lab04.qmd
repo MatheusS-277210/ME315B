@@ -1,0 +1,91 @@
+---
+title: "Lab_04"
+author: "Matheus Soares - RA:277210"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+### 1. Pacotes
+
+```{r}
+library(readxl)
+library(tidyverse)
+```
+
+### 2. Caminho do arquivo
+
+```{r}
+fname <- "E:/Rstudio/WDIEXCEL.xlsx"
+file.exists(fname)
+```
+
+### 3. Planilha Country
+
+```{r}
+countries <- read_excel(fname, sheet = "Country")
+```
+
+### 4. Filtrando 5 países
+
+```{r}
+countries <- countries %>%
+  filter(`Short Name` %in% c("Brazil", "Argentina", "Chile", "Uruguay", "Paraguay"))
+```
+
+### 5. Planilha Data
+
+```{r}
+WDI <- read_excel(fname, sheet = "Data")
+```
+
+### 6. Selecionando colunas
+
+```{r}
+WDI <- WDI %>%
+  select(`Country Code`, `Indicator Code`, `1960`:`2018`)
+```
+
+### 7. Formato tidy
+
+```{r}
+# os anos estão em colunas, então não está tidy
+# transformando para long, com uma coluna YEAR
+WDI <- WDI %>%
+  pivot_longer(cols = `1960`:`2018`,
+               names_to = "YEAR",
+               values_to = "valor")
+```
+
+### 8. YEAR como inteiro
+
+```{r}
+WDI <- WDI %>%
+  mutate(YEAR = as.integer(YEAR))
+```
+
+### 9. Filtrando países e selecionando colunas
+
+```{r}
+WDI <- WDI %>%
+  filter(`Country Code` %in% countries$`Country Code`,
+         `Indicator Code` == "SP.DYN.CBRT.IN") %>%
+  left_join(countries %>% select(`Country Code`, `Short Name`),
+            by = "Country Code") %>%
+  select(`Country Code`, `Short Name`, YEAR, SP.DYN.CBRT.IN = valor)
+```
+
+### 10. Ordenando
+
+```{r}
+WDI <- WDI %>%
+  arrange(`Country Code`, YEAR)
+```
+
+### 11. Gráfico
+
+```{r}
+ggplot(WDI, aes(x = YEAR, y = SP.DYN.CBRT.IN, color = `Short Name`)) +
+  geom_line()
+```
