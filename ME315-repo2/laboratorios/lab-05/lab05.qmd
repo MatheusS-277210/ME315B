@@ -1,0 +1,179 @@
+---
+title: "Lab_05"
+author: "Matheus Soares - RA:277210"
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+### 1. Pacotes
+
+```{r}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(leaflet)
+library(scales)
+```
+
+### 2. Caminhos dos arquivos
+
+```{r}
+arquivo_voos <- file.path("dados", "flights.csv.zip")
+
+
+arquivo_aeroportos <- file.path("dados", "airports.csv")
+
+file.exists(arquivo_voos)
+file.exists(arquivo_aeroportos)
+```
+
+### 3. Coordenadas dos aeroportos
+
+```{r}
+aeroportos <- read_csv(arquivo_aeroportos, show_col_types = FALSE)
+```
+
+### 4. Função `analisa_aeronave`
+
+```{r}
+
+analisa_aeronave <- function(tail_number, arquivo) {
+
+
+  filtra_por_aeronave <- function(bloco, pos) {
+    dplyr::filter(bloco, TAIL_NUMBER == tail_number)
+  }
+
+  voos_aeronave <- readr::read_csv_chunked(
+    file        = arquivo,
+    callback    = readr::DataFrameCallback$new(filtra_por_aeronave),
+    chunk_size  = 100000,
+    col_types   = readr::cols(.default = "c"),  # leitura bruta como texto
+    progress    = FALSE
+  )
+
+  
+  voos_aeronave <- voos_aeronave %>%
+    dplyr::mutate(
+      YEAR                 = as.integer(YEAR),
+      MONTH                = as.integer(MONTH),
+      DAY                  = as.integer(DAY),
+      SCHEDULED_DEPARTURE  = as.integer(SCHEDULED_DEPARTURE),
+      DISTANCE             = as.numeric(DISTANCE),
+      AIR_TIME             = as.numeric(AIR_TIME),
+      DATA_VOO             = lubridate::make_date(YEAR, MONTH, DAY)
+    ) %>%
+    
+    dplyr::arrange(DATA_VOO, SCHEDULED_DEPARTURE) %>%
+    dplyr::mutate(ORDEM_VOO = dplyr::row_number())
+
+
+  voos_aeronave <- voos_aeronave %>%
+    dplyr::mutate(
+      VELOCIDADE_MEDIA_MPH = dplyr::if_else(
+        !is.na(AIR_TIME) & AIR_TIME > 0,
+        DISTANCE / (AIR_TIME / 60),
+        NA_real_
+      )
+    )
+
+
+  trajeto <- voos_aeronave %>%
+    dplyr::left_join(
+      aeroportos %>%
+        dplyr::select(IATA_CODE, LAT_ORIGEM = LATITUDE, LON_ORIGEM = LONGITUDE),
+      by = c("ORIGIN_AIRPORT" = "IATA_CODE")
+    ) %>%
+    dplyr::left_join(
+      aeroportos %>%
+        dplyr::select(IATA_CODE, LAT_DESTINO = LATITUDE, LON_DESTINO = LONGITUDE),
+      by = c("DESTINATION_AIRPORT" = "IATA_CODE")
+    )
+
+
+  mapa <- leaflet::leaflet(trajeto) %>%
+    leaflet::addTiles()
+
+  faixa_velocidade <- range(trajeto$VELOCIDADE_MEDIA_MPH, na.rm = TRUE)
+
+  for (i in seq_len(nrow(trajeto))) {
+    voo_atual <- trajeto[i, ]
+
+    coordenadas_completas <- all(!is.na(c(
+      voo_atual$LAT_ORIGEM, voo_atual$LON_ORIGEM,
+      voo_atual$LAT_DESTINO, voo_atual$LON_DESTINO
+    )))
+
+    if (coordenadas_completas) {
+      espessura_linha <- scales::rescale(
+        voo_atual$VELOCIDADE_MEDIA_MPH,
+        to   = c(1, 8),
+        from = faixa_velocidade
+      )
+
+      mapa <- mapa %>%
+        leaflet::addPolylines(
+          lng     = c(voo_atual$LON_ORIGEM, voo_atual$LON_DESTINO),
+          lat     = c(voo_atual$LAT_ORIGEM, voo_atual$LAT_DESTINO),
+          weight  = espessura_linha,
+          color   = "steelblue",
+          opacity = 0.8,
+          popup   = paste0(
+            "Voo ", voo_atual$ORDEM_VOO, ": ",
+            voo_atual$ORIGIN_AIRPORT, " -> ", voo_atual$DESTINATION_AIRPORT,
+            "<br>Data: ", voo_atual$DATA_VOO,
+            "<br>Velocidade média: ", round(voo_atual$VELOCIDADE_MEDIA_MPH, 0), " mph"
+          )
+        )
+    }
+  }
+
+  
+  aeroportos_visitados <- trajeto %>%
+    dplyr::select(AEROPORTO = ORIGIN_AIRPORT, LAT = LAT_ORIGEM, LON = LON_ORIGEM) %>%
+    dplyr::distinct(AEROPORTO, .keep_all = TRUE)
+
+  mapa <- mapa %>%
+    leaflet::addCircleMarkers(
+      data   = aeroportos_visitados,
+      lng    = ~LON,
+      lat    = ~LAT,
+      radius = 5,
+      color  = "darkred",
+      label  = ~AEROPORTO
+    )
+
+  
+  list(
+    tabela  = trajeto,
+    grafico = mapa
+  )
+}
+```
+
+### 5. Testando a função
+
+```{r}
+resultado <- analisa_aeronave(
+  tail_number = "N431WN",
+  arquivo     = arquivo_voos
+)
+```
+
+### 6. Tabela de trajetos
+
+```{r}
+resultado$tabela
+```
+
+### 7. Mapa do trajeto
+
+```{r}
+resultado$grafico
+```
+
+```{r}
+Sys.time()
+```
