@@ -1,0 +1,89 @@
+---
+title: "Lab_11"
+author: "Matheus Soares - RA:277210"
+format:
+  html:
+    embed-resources: true
+editor: visual
+jupyter: python3
+---
+
+### Pacotes
+
+```{python}
+from plotnine import (ggplot, aes, geom_point, geom_smooth, facet_wrap,
+                      facet_grid, scale_x_log10, scale_y_log10, labs,
+                      theme_bw, theme)
+```
+
+### 1. Importando o conjunto de dados
+
+```{python}
+from plotnine.data import diamonds
+diamonds.head()
+```
+
+### 2. Associação entre peso (carat) e preço (price)
+
+```{python}
+(
+    ggplot(diamonds, aes(x="carat", y="price"))
+    + geom_point(alpha=0.1)
+    + geom_smooth(method="lm", color="red")
+    + labs(x="Peso (quilates)", y="Preço (US$)",
+           title="Preço x peso dos diamantes")
+    + theme_bw()
+)
+```
+
+Como são quase 54 mil diamantes, os pontos ficam muito sobrepostos, então usei `alpha` baixo pra ver onde estão concentrados. Também coloquei títulos nos eixos e uma linha de tendência. Pelo gráfico, quanto maior o peso, maior o preço, mas a relação não é uma reta: o preço sobe cada vez mais rápido e a variação do preço também aumenta nos diamantes mais pesados. Para deixar a relação mais fácil de ler, testei a escala logarítmica nos dois eixos:
+
+```{python}
+(
+    ggplot(diamonds, aes(x="carat", y="price"))
+    + geom_point(alpha=0.1)
+    + geom_smooth(method="lm", color="red")
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(x="Peso (quilates, escala log)", y="Preço (US$, escala log)",
+           title="Preço x peso dos diamantes (escala log)")
+    + theme_bw()
+)
+```
+
+Na escala log a relação fica bem próxima de uma reta, e a dispersão fica parecida ao longo do peso. Ou seja, o preço aumenta de forma positiva e forte com o peso.
+
+### 3. A relação é a mesma para os diferentes cortes?
+
+```{python}
+(
+    ggplot(diamonds, aes(x="carat", y="price"))
+    + geom_point(alpha=0.1)
+    + geom_smooth(method="lm", color="red")
+    + facet_wrap("cut")
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(x="Peso (quilates, escala log)", y="Preço (US$, escala log)")
+    + theme_bw()
+)
+```
+
+Em todos os cortes a relação é positiva e parecida: diamantes mais pesados são mais caros. O que muda é o nível e um pouco a inclinação da reta entre os cortes, então a tendência geral é a mesma, mas o preço para um mesmo peso não é exatamente igual em cada tipo de corte.
+
+### 4. Preço e peso por corte, cor e clareza
+
+```{python}
+(
+    ggplot(diamonds, aes(x="carat", y="price", color="clarity"))
+    + geom_point(alpha=0.2, size=0.5)
+    + geom_smooth(method="lm", se=False)
+    + facet_grid("cut ~ color")
+    + scale_x_log10()
+    + scale_y_log10()
+    + labs(x="Peso (quilates, escala log)", y="Preço (US$, escala log)")
+    + theme_bw()
+    + theme(figure_size=(14, 10))
+)
+```
+
+A principal dificuldade foi a quantidade de combinações: são 5 cortes, 7 cores e 8 níveis de clareza, o que dá 280 grupos. Para caber no gráfico, usei painéis para corte e cor e deixei a clareza como cor dos pontos, mas o resultado fica poluído. Algumas combinações também têm poucos diamantes (por exemplo, clareza I1 ou IF em certas cores), e aí as retas ficam pouco confiáveis. Mesmo assim, em quase todos os painéis a relação entre preço e peso continua positiva. O que muda de uma configuração pra outra é o nível dos preços (clareza e cor melhores tendem a ficar acima) e, em alguns casos, a inclinação, então a relação não é exatamente a mesma, apesar de o sentido ser sempre o mesmo.
